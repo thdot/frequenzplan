@@ -12,12 +12,18 @@ SUB_REGEXS = (
 FREQ_ENTRY_REGEX = re.compile(
     'Frequenzteilplan:\s*(?P<Frequenzteilplan>\S+)\s+'
     'Eintrag:\s*(?P<Eintrag>\S+).*\n'
-    'Frequenzbereich:\s*(?P<Frequenzbereich>.*)\n'
+    'Frequenzbereich:\s*(?P<Frequenzbereich>'
+        '(?P<Frequenzbereich_Start>[\d,\.]+)\s*-\s*'
+        '(?P<Frequenzbereich_Ende>[\d,\.]+) '
+        '(?P<Frequenzbereich_Einheit>kHz|MHz|GHz))\n'
     'Nutzungsbestimmung\(en\):\s*(?P<Nutzungsbestimmungen>.*)\n'
     'Funkdienst:\s*(?P<Funkdienst>[\s\S]*)\n'
     'Nutzung:\s*(?P<Nutzung>.*)\n'
     'Frequenznutzung:\s*(?P<Frequenznutzung>.*)\n'
-    'Frequenzteilbereich\(e\):\s*(?P<Frequenzteilbereiche>.*)\n'
+    'Frequenzteilbereich\(e\):\s*(?P<Frequenzteilbereiche>'
+        '(?P<Frequenzteilbereiche_Start>[\d,\.]+)\s*-\s*'
+        '(?P<Frequenzteilbereiche_Ende>[\d,\.]+) '
+        '(?P<Frequenzteilbereiche_Einheit>kHz|MHz|GHz))\n'
     'Frequenznutzungs-\nbedingungen:\s*(?P<Frequenznutzungsbedingungen>[\s\S]*)\n'
 )
 TERMS_OF_USE_REGEX = re.compile(
@@ -31,13 +37,20 @@ TERM_REGEX = re.compile(
     '\n*([A-Z0-9]+)\s+(.+?)\n\n'
 )
 
-
 def get_pdf_as_txt(input, mode):
     txt = subprocess.run(['pdftotext', mode, input, '-'],
             check=True, stdout=subprocess.PIPE).stdout.decode('utf-8')
     for r in SUB_REGEXS:
         txt = re.sub(r, '', txt)
     return txt
+
+def convert_freq_to_hz(freq, unit):
+    FREQ_TO_HZ = {
+        'kHz': 1000,
+        'MHz': 1000 * 1000,
+        'GHz': 1000 * 1000 * 1000
+    }
+    return int(float(freq.replace(',', '.')) * FREQ_TO_HZ[unit])
 
 def parse(input, output):
     txt = get_pdf_as_txt(input, '-raw')
@@ -49,6 +62,10 @@ def parse(input, output):
             print(e)
             sys.exit(1)
         entry = m.groupdict()
+        for attr in ('Frequenzbereich', 'Frequenzteilbereiche'):
+            entry[attr + '_Start'] = convert_freq_to_hz(entry[attr + '_Start'], entry[attr + '_Einheit'])
+            entry[attr + '_Ende'] = convert_freq_to_hz(entry[attr + '_Ende'], entry[attr + '_Einheit'])
+            entry.pop(attr + '_Einheit')
         entries.append(entry)
 
     txt = get_pdf_as_txt(input, '-layout')

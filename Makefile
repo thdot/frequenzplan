@@ -7,5 +7,8 @@ PDF_URL = https://www.bundesnetzagentur.de/SharedDocs/Downloads/DE/Sachgebiete/T
 Frequenzplan.pdf:
 	curl -o $@ $(PDF_URL)
 
-http.server-run:
+run-http.server:
 	python3 -m http.server --directory html
+
+clean:
+	rm -f html/data.json
